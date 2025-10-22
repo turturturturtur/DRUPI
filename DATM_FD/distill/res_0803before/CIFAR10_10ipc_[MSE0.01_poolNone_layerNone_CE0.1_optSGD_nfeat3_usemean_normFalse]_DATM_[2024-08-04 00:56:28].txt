@@ -1,0 +1,66 @@
+CUDNN STATUS: True
+feature_strategy:  mean
+Files already downloaded and verified
+Files already downloaded and verified
+Train ZCA
+Test ZCA
+<class 'kornia.enhance.zca.ZCAWhitening'>
+Hyper-parameters: 
+ {'cfg': '../configs/CIFAR-10/ConvIN/IPC10.yaml', 'lbd': 0.01, 'lr_feat': 0.1, 'layer_idx': None, 'pooling': None, 'feat_lbd': 0.1, 'feat_opt': 'SGD', 'n_feat': 3, 'eval_freq': 4, 'use_feature': 'mean', 'feat_norm': False, 'contrast': False, 'lbd_contrast': 0.1, 'feat_metric': 'MSE', 'img_method': 'DATM', 'img_path': '../../distilled_data', 'res_path': 'res', 'dataset': 'CIFAR10', 'subset': 'imagenette', 'model': 'ConvNet', 'ipc': 10, 'eval_mode': 'S', 'num_eval': 1, 'eval_it': 500, 'epoch_eval_train': 1000, 'Iteration': 10000, 'lr_img': 100, 'lr_teacher': 0.01, 'lr_init': 0.01, 'batch_real': 256, 'batch_syn': 100, 'batch_train': 128, 'pix_init': 'samples_predicted_correctly', 'dsa': True, 'dsa_strategy': 'color_crop_cutout_flip_scale_rotate', 'data_path': '../dataset', 'buffer_path': '../buffer_storage/', 'expert_epochs': 2, 'syn_steps': 80, 'max_start_epoch': 20, 'min_start_epoch': 0, 'zca': True, 'load_all': False, 'no_aug': False, 'texture': False, 'canvas_size': 2, 'canvas_samples': 1, 'max_files': None, 'max_experts': None, 'force_save': False, 'ema_decay': 0.9995, 'lr_y': 2.0, 'Momentum_y': 0.9, 'project': 'CIFAR10_ipc10', 'threshold': 1.0, 'record_loss': False, 'Sequential_Generation': True, 'expansion_end_epoch': 1000, 'current_max_start_epoch': 10, 'skip_first_eva': True, 'parall_eva': False, 'lr_lr': 1e-05, 'res': 32, 'device': 'cuda', 'Initialize_Label_With_Another_Model': False, 'Initialize_Label_Model': '', 'Initialize_Label_Model_Dir': '', 'Label_Model_Timestamp': -1, 'zca_trans': ZCAWhitening(), 'im_size': [32, 32], 'dc_aug_param': None, 'dsa_param': <utils.utils_baseline.ParamDiffAug object at 0x7fc702b1a520>, '_wandb': {}, 'distributed': True}
+Evaluation model pool:  ['ConvNet']
+BUILDING DATASET
+class c = 0: 5000 real images
+class c = 1: 5000 real images
+class c = 2: 5000 real images
+class c = 3: 5000 real images
+class c = 4: 5000 real images
+class c = 5: 5000 real images
+class c = 6: 5000 real images
+class c = 7: 5000 real images
+class c = 8: 5000 real images
+class c = 9: 5000 real images
+real images channel 0, mean = 0.0000, std = 0.2681
+real images channel 1, mean = 0.0000, std = 0.2532
+real images channel 2, mean = -0.0000, std = 0.2617
+Expert Dir: ../buffer_storage/CIFAR10/ConvNet
+loading file ../buffer_storage/CIFAR10/ConvNet/replay_buffer_7.pt
+[2024-08-04 00:57:55] training begins
+tensor(0.4793, device='cuda:0', grad_fn=<DivBackward0>) tensor(0.1687, device='cuda:0', grad_fn=<MseLossBackward0>)
+[2024-08-04 00:58:03] it = 0 Grand_Loss = 0.6448872089385986,Start_Epoch = 5 
+loss_feat_total = 19.2552433013916,Start_Epoch = 5 
+feat matching loss =  tensor(0.2407, device='cuda:0', grad_fn=<DivBackward0>)
+loss_avg_feature_step =  tensor(2.3263, device='cuda:0', grad_fn=<DivBackward0>)
+feat acc_avg_feat =  10.0%
+[2024-08-04 00:58:03] iter = 0000, grand_loss = 0.6449, loss_feat_total = 19.2552
+tensor(2.3397, device='cuda:0', grad_fn=<DivBackward0>) tensor(0.1717, device='cuda:0', grad_fn=<MseLossBackward0>)
+tensor(0.8131, device='cuda:0', grad_fn=<DivBackward0>) tensor(0.1714, device='cuda:0', grad_fn=<MseLossBackward0>)
+tensor(0.7989, device='cuda:0', grad_fn=<DivBackward0>) tensor(0.1711, device='cuda:0', grad_fn=<MseLossBackward0>)
+tensor(0.3172, device='cuda:0', grad_fn=<DivBackward0>) tensor(0.1679, device='cuda:0', grad_fn=<MseLossBackward0>)
+tensor(0.2192, device='cuda:0', grad_fn=<DivBackward0>) tensor(0.1610, device='cuda:0', grad_fn=<MseLossBackward0>)
+tensor(0.7569, device='cuda:0', grad_fn=<DivBackward0>) tensor(0.1680, device='cuda:0', grad_fn=<MseLossBackward0>)
+tensor(0.4220, device='cuda:0', grad_fn=<DivBackward0>) tensor(0.1713, device='cuda:0', grad_fn=<MseLossBackward0>)
+tensor(1.4077, device='cuda:0', grad_fn=<DivBackward0>) tensor(0.1790, device='cuda:0', grad_fn=<MseLossBackward0>)
+loading file ../buffer_storage/CIFAR10/ConvNet/replay_buffer_8.pt
+tensor(0.8032, device='cuda:0', grad_fn=<DivBackward0>) tensor(0.1743, device='cuda:0', grad_fn=<MseLossBackward0>)
+tensor(0.3106, device='cuda:0', grad_fn=<DivBackward0>) tensor(0.1644, device='cuda:0', grad_fn=<MseLossBackward0>)
+[2024-08-04 00:59:35] iter = 0010, grand_loss = 0.6728, loss_feat_total = 19.2666
+tensor(0.4192, device='cuda:0', grad_fn=<DivBackward0>) tensor(0.1733, device='cuda:0', grad_fn=<MseLossBackward0>)
+tensor(0.3236, device='cuda:0', grad_fn=<DivBackward0>) tensor(0.1741, device='cuda:0', grad_fn=<MseLossBackward0>)
+tensor(0.2624, device='cuda:0', grad_fn=<DivBackward0>) tensor(0.1690, device='cuda:0', grad_fn=<MseLossBackward0>)
+tensor(1.8798, device='cuda:0', grad_fn=<DivBackward0>) tensor(0.1691, device='cuda:0', grad_fn=<MseLossBackward0>)
+tensor(0.7989, device='cuda:0', grad_fn=<DivBackward0>) tensor(0.1742, device='cuda:0', grad_fn=<MseLossBackward0>)
+tensor(0.3216, device='cuda:0', grad_fn=<DivBackward0>) tensor(0.1619, device='cuda:0', grad_fn=<MseLossBackward0>)
+tensor(0.3671, device='cuda:0', grad_fn=<DivBackward0>) tensor(0.1713, device='cuda:0', grad_fn=<MseLossBackward0>)
+tensor(0.3397, device='cuda:0', grad_fn=<DivBackward0>) tensor(0.1684, device='cuda:0', grad_fn=<MseLossBackward0>)
+loading file ../buffer_storage/CIFAR10/ConvNet/replay_buffer_1.pt
+tensor(1.6605, device='cuda:0', grad_fn=<DivBackward0>) tensor(0.1684, device='cuda:0', grad_fn=<MseLossBackward0>)
+tensor(0.4486, device='cuda:0', grad_fn=<DivBackward0>) tensor(0.1728, device='cuda:0', grad_fn=<MseLossBackward0>)
+[2024-08-04 01:01:04] iter = 0020, grand_loss = 0.5476, loss_feat_total = 19.1463
+tensor(0.2472, device='cuda:0', grad_fn=<DivBackward0>) tensor(0.1718, device='cuda:0', grad_fn=<MseLossBackward0>)
+tensor(0.2490, device='cuda:0', grad_fn=<DivBackward0>) tensor(0.1638, device='cuda:0', grad_fn=<MseLossBackward0>)
+tensor(0.2601, device='cuda:0', grad_fn=<DivBackward0>) tensor(0.1737, device='cuda:0', grad_fn=<MseLossBackward0>)
+tensor(0.6410, device='cuda:0', grad_fn=<DivBackward0>) tensor(0.1694, device='cuda:0', grad_fn=<MseLossBackward0>)
+tensor(0.8930, device='cuda:0', grad_fn=<DivBackward0>) tensor(0.1651, device='cuda:0', grad_fn=<MseLossBackward0>)
+tensor(2.3326, device='cuda:0', grad_fn=<DivBackward0>) tensor(0.1650, device='cuda:0', grad_fn=<MseLossBackward0>)
+tensor(0.7609, device='cuda:0', grad_fn=<DivBackward0>) tensor(0.1716, device='cuda:0', grad_fn=<MseLossBackward0>)
+tensor(0.3925, device='cuda:0', grad_fn=<DivBackward0>) tensor(0.1660, device='cuda:0', grad_fn=<MseLossBackward0>)

@@ -1,0 +1,34 @@
+CUDNN STATUS: True
+feature_strategy:  mean
+Files already downloaded and verified
+Files already downloaded and verified
+Train ZCA
+Test ZCA
+<class 'kornia.enhance.zca.ZCAWhitening'>
+Hyper-parameters: 
+ {'cfg': '../configs/CIFAR-10/ConvIN/IPC10.yaml', 'lbd': 0.01, 'lr_feat': 0.1, 'layer_idx': None, 'pooling': None, 'feat_lbd': 0.5, 'feat_opt': 'SGD', 'n_feat': 1, 'eval_freq': 4, 'use_feature': 'mean', 'feat_norm': False, 'contrast': False, 'lbd_contrast': 0.1, 'feat_metric': 'MSE', 'img_method': 'DATM', 'img_path': '../../distilled_data', 'dataset': 'CIFAR10', 'subset': 'imagenette', 'model': 'ConvNet', 'ipc': 10, 'eval_mode': 'S', 'num_eval': 1, 'eval_it': 500, 'epoch_eval_train': 1000, 'Iteration': 10000, 'lr_img': 100, 'lr_teacher': 0.01, 'lr_init': 0.01, 'batch_real': 256, 'batch_syn': 100, 'batch_train': 128, 'pix_init': 'samples_predicted_correctly', 'dsa': True, 'dsa_strategy': 'color_crop_cutout_flip_scale_rotate', 'data_path': '../dataset', 'buffer_path': '../buffer_storage/', 'expert_epochs': 2, 'syn_steps': 80, 'max_start_epoch': 20, 'min_start_epoch': 0, 'zca': True, 'load_all': False, 'no_aug': False, 'texture': False, 'canvas_size': 2, 'canvas_samples': 1, 'max_files': None, 'max_experts': None, 'force_save': False, 'ema_decay': 0.9995, 'lr_y': 2.0, 'Momentum_y': 0.9, 'project': 'CIFAR10_ipc10', 'threshold': 1.0, 'record_loss': False, 'Sequential_Generation': True, 'expansion_end_epoch': 1000, 'current_max_start_epoch': 10, 'skip_first_eva': True, 'parall_eva': False, 'lr_lr': 1e-05, 'res': 32, 'device': 'cuda', 'Initialize_Label_With_Another_Model': False, 'Initialize_Label_Model': '', 'Initialize_Label_Model_Dir': '', 'Label_Model_Timestamp': -1, 'zca_trans': ZCAWhitening(), 'im_size': [32, 32], 'dc_aug_param': None, 'dsa_param': <utils.utils_baseline.ParamDiffAug object at 0x7f6a35682340>, '_wandb': {}, 'distributed': True}
+Evaluation model pool:  ['ConvNet']
+BUILDING DATASET
+class c = 0: 5000 real images
+class c = 1: 5000 real images
+class c = 2: 5000 real images
+class c = 3: 5000 real images
+class c = 4: 5000 real images
+class c = 5: 5000 real images
+class c = 6: 5000 real images
+class c = 7: 5000 real images
+class c = 8: 5000 real images
+class c = 9: 5000 real images
+real images channel 0, mean = 0.0000, std = 0.2681
+real images channel 1, mean = 0.0000, std = 0.2532
+real images channel 2, mean = -0.0000, std = 0.2617
+Expert Dir: ../buffer_storage/CIFAR10/ConvNet
+loading file ../buffer_storage/CIFAR10/ConvNet/replay_buffer_7.pt
+[2024-07-30 23:21:14] training begins
+[2024-07-30 23:21:18] it = 0 Grand_Loss = 0.6430020928382874,Start_Epoch = 5 
+loss_feat_total = 95.64380645751953,Start_Epoch = 5 
+feat matching loss =  tensor(1.1955, device='cuda:0', grad_fn=<DivBackward0>)
+loss_avg_feature_step =  tensor(2.3750, device='cuda:0', grad_fn=<DivBackward0>)
+feat acc_avg_feat =  6.0%
+[2024-07-30 23:21:18] iter = 0000, grand_loss = 0.6430, loss_feat_total = 95.6438
+

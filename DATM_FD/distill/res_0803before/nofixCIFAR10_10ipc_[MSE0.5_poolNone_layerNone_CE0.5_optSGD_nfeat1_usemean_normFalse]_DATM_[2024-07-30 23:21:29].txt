@@ -1,0 +1,5 @@
+CUDNN STATUS: True
+feature_strategy:  mean
+Files already downloaded and verified
+Files already downloaded and verified
+Train ZCA

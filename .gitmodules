@@ -1,0 +1,3 @@
+[submodule "DATM"]
+	path = DATM
+	url = https://github.com/NUS-HPC-AI-Lab/DATM.git

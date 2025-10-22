@@ -1,0 +1,3 @@
+CUDNN STATUS: True
+feature_strategy:  random
+Downloading https://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz to res/cifar-10-python.tar.gz
