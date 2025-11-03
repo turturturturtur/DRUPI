@@ -327,6 +327,7 @@ if __name__ == '__main__':
     parser.add_argument('--syn_steps', type=int, default=80, help='how many steps to take on synthetic data')
     parser.add_argument('--expert_epochs', type=int, default=2, help='how many expert epochs the target params are')
     parser.add_argument('--max_start_epoch', type=int, default=70, help='max epoch we can start at')
+    parser.add_argument('--current_max_start_epoch', type=int, default=30, help='current max epoch we can start at, for sequential generation')
     parser.add_argument('--min_start_epoch', type=int, default=20, help='min epoch we can start at')
     
     # 批次大小
