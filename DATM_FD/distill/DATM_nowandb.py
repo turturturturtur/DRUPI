@@ -169,6 +169,7 @@ def main(args):
         Initialize_Labels_params = torch.cat([p.data.to(args.device).reshape(-1) for p in Temp_params], 0)
         if args.distributed:
             Initialize_Labels_params = Initialize_Labels_params.unsqueeze(0).expand(torch.cuda.device_count(), -1)
+        image_syn_on_device = image_syn.to(args.device)    
         Initialized_Labels = Temp_net(image_syn, flat_param=Initialize_Labels_params)
         acc = np.sum(np.equal(np.argmax(Initialized_Labels.cpu().data.numpy(), axis=-1), label_syn.cpu().data.numpy()))
         print('InitialAcc (before softmax):{}'.format(acc/len(label_syn)))
@@ -190,14 +191,15 @@ def main(args):
                 print('--- Evaluating model: %s ---' % model_eval)
                 accs_test = []
                 for it_eval in range(args.num_eval):
-                    device_eval = torch.device("cuda:0") if not args.parall_eva else args.device
+                    # device_eval = torch.device("cuda:0") if not args.parall_eva else args.device
+                    device_eval = args.device
                     net_eval = get_network(model_eval, channel, num_classes, im_size, dist=False).to(device_eval)
                     
                     with torch.no_grad():
                         image_syn_eval, label_syn_eval = image_syn.detach(), label_syn.detach()
 
                     args.lr_net = syn_lr.item()
-                    _, _, acc_test = evaluate_synset(it_eval, net_eval, image_syn_eval, label_syn_eval, testloader, args, criterion)
+                    acc_test = evaluate_synset(it_eval, net_eval, image_syn_eval, label_syn_eval, testloader, args, train_criterion=criterion)
                     accs_test.append(acc_test)
                 
                 accs_test = np.array(accs_test)
@@ -311,7 +313,7 @@ if __name__ == '__main__':
     parser.add_argument('--Iteration', type=int, default=10000, help='how many distillation steps to perform')
     parser.add_argument('--lr_img', type=float, default=1000, help='learning rate for updating synthetic images')
     parser.add_argument('--lr_lr', type=float, default=1e-05, help='learning rate for updating... learning rate')
-    parser.add_argument('--lr_teacher', type=float, default=0.01, help='initialization for synthetic learning rate')
+    parser.add_argument('--lr_teacher', type=float, default=0.001, help='initialization for synthetic learning rate')
     parser.add_argument('--lr_y', type=float, default=10.0, help='learning rate for updating synthetic labels')
     parser.add_argument('--Momentum_y', type=float, default=0.9, help='momentum for updating synthetic labels')
     parser.add_argument('--threshold', type=float, default=1.0, help='threshold for training')
