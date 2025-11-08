@@ -28,7 +28,14 @@ def manual_seed(seed=0):
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
-    
+def safe_avg_pool2d(x, kernel_size=2, stride=2, padding=0, ceil_mode=False):
+    if x.dim() == 4:
+        h, w = x.shape[-2:]
+        if h < kernel_size or w < kernel_size:
+            # 太小就不池化，直接返回
+            return x
+    return F.avg_pool2d(x, kernel_size=kernel_size, stride=stride,
+                        padding=padding, ceil_mode=ceil_mode)
 def main(args):
     # manual_seed()
     if args.zca and args.texture:
@@ -128,7 +135,7 @@ def main(args):
     for i in tqdm(range(len(dst_train))):
         sample = dst_train[i]
         images_all.append(torch.unsqueeze(sample[0], dim=0))
-        labels_all.append(class_map[torch.tensor(sample[1]).item()])
+        labels_all.append(class_map[int(sample[1])])
 
     for i, lab in tqdm(enumerate(labels_all)):
         indices_class[lab].append(i)
@@ -139,17 +146,17 @@ def main(args):
         if args.pooling == "avg":
             # avgpooling2d function
             pooling_function = partial(
-                torch.nn.functional.adaptive_avg_pool2d, output_size=(1, 1)
+                F.adaptive_avg_pool2d, output_size=(1, 1)
             )
         elif args.pooling == "max":
             # maxpooling2d function
             pooling_function = partial(
-                torch.nn.functional.adaptive_max_pool2d, output_size=(1, 1)
+                F.adaptive_max_pool2d, output_size=(1, 1)
             )
         elif args.pooling == "sum":
             # sumpooling2d function
             pooling_function = partial(
-                torch.nn.functional.adaptive_sum_pool2d, output_size=(1, 1)
+                lambda t: t.sum(dim=(-2, -1), keepdim=True)
             )
         else:
             raise NotImplementedError("Pooling method not implemented")
@@ -163,6 +170,23 @@ def main(args):
     for ch in range(channel):
         print('real images channel %d, mean = %.4f, std = %.4f'%(ch, torch.mean(images_all[:, ch]), torch.std(images_all[:, ch])))
 
+    # ==== (NEW) generate_pretrained: 从真实数据抽样并生成 images_best.pt ====
+    if args.generate_pretrained:
+        # 每类随机抽 args.ipc 张，按 [num_classes*ipc, C, H, W] 组织
+        image_syn = torch.empty(size=(num_classes * args.ipc, channel, im_size[0], im_size[1]),
+                                dtype=torch.float32, device='cpu')
+        for c in range(num_classes):
+            idx_shuffle = np.random.permutation(indices_class[c])[:args.ipc]
+            image_syn[c*args.ipc:(c+1)*args.ipc] = images_all[idx_shuffle]  # images_all 在前面已在 CPU
+
+        os.makedirs(load_path, exist_ok=True)
+        save_file = osp.join(load_path, "images_best.pt")
+        torch.save(image_syn.detach().cpu(), save_file)
+        print(f"[OK] Pretrained images saved to: {save_file}")
+        print("You can now run training with --pix_init real (without --generate_pretrained).")
+        return  # 只做预生成则直接退出
+
+
 
     def get_images(c, n):  # get random n images from class c
         idx_shuffle = np.random.permutation(indices_class[c])[:n]
@@ -170,7 +194,7 @@ def main(args):
 
 
     ''' initialize the synthetic data '''
-    label_syn = torch.tensor([np.ones(args.ipc,dtype=np.int_)*i for i in range(num_classes)], dtype=torch.long, requires_grad=False, device=args.device).view(-1) # [0,0,0, 1,1,1, ..., 9,9,9]
+    label_syn = torch.arange(num_classes, device=args.device, dtype=torch.long).repeat_interleave(args.ipc) # [0,0,0, 1,1,1, ..., 9,9,9]
 
     if args.texture:
         image_syn = torch.randn(size=(num_classes * args.ipc, channel, im_size[0]*args.canvas_size, im_size[1]*args.canvas_size), dtype=torch.float)
@@ -180,12 +204,14 @@ def main(args):
     syn_lr = torch.tensor(args.lr_teacher).to(args.device)
 
     if args.pix_init == 'real':
-        image_syn_pretrained = torch.load(osp.join(load_path, f"images_best.pt")).to(
-            args.device
-        )
-        image_syn = (
-            image_syn_pretrained.clone().detach().requires_grad_(True).to(args.device)
-        )
+        pretrained_file = osp.join(load_path, "images_best.pt")
+        if not osp.exists(pretrained_file):
+            raise FileNotFoundError(
+                f"Missing pretrained file: {pretrained_file}\n"
+                f"请先运行带 --generate_pretrained 的命令预生成该文件，再用 --pix_init real 训练。"
+            )
+        image_syn_pretrained = torch.load(pretrained_file).to(args.device)
+        image_syn = image_syn_pretrained.clone().detach().requires_grad_(True).to(args.device)
         del image_syn_pretrained
         feature_syn = []
         for _ in range(args.n_feat):
@@ -269,6 +295,81 @@ def main(args):
     #
 
     criterion = nn.CrossEntropyLoss().to(args.device)
+
+    # ========= Checkpoint: 收集已创建对象 / 定义保存与加载 / 可选恢复 =========
+
+    # 统一的 ckpt 目录，和你保存图片的目录保持同一 run 名称（model_args）
+    ckpt_dir  = osp.join(".", "logged_files", args.dataset, model_args, "ckpts")
+    ckpt_last = osp.join(ckpt_dir, "ckpt_last.pt")
+    ckpt_best = osp.join(ckpt_dir, "ckpt_best.pt")
+
+    # 收集你已经创建好的优化器（名字跟你的代码一致）
+    optimizers = {}
+    if 'optimizer_img' in locals() and optimizer_img is not None:
+        optimizers['img']  = optimizer_img
+    if 'optimizer_lr' in locals() and optimizer_lr is not None:
+        optimizers['lr']   = optimizer_lr
+    if 'optimizer_feat' in locals() and optimizer_feat is not None:
+        optimizers['feat'] = optimizer_feat
+
+    # 你的脚本目前没用 scheduler & 混合精度，先占位（有就会加载，没有就忽略）
+    schedulers = {}
+    scaler = locals().get('scaler', None)
+
+    def _save_ckpt(path, it, best_acc_dict):
+        state = {
+            # 关键：把可训练“张量参数”都存起来（注意不是 student_net；student_net 每个 it 都重建）
+            'image_syn': image_syn.detach().cpu(),
+            'feature_syn': feature_syn.detach().cpu(),
+            'syn_lr': syn_lr.detach().cpu(),
+            # 优化器（官方建议同时保存）：
+            'optimizers': {k: opt.state_dict() for k, opt in optimizers.items()},
+            'schedulers': {k: sch.state_dict() for k, sch in schedulers.items()},
+            'scaler': scaler.state_dict() if scaler is not None else None,
+            # 迭代与指标
+            'iter': int(it),
+            'best_acc_dict': best_acc_dict,
+            'args': vars(args),
+        }
+        os.makedirs(osp.dirname(path), exist_ok=True)
+        torch.save(state, path)
+
+    def _load_ckpt(path):
+        ckpt = torch.load(path, map_location=args.device)
+        # 1) 把保存的“张量参数”拷回现有张量（保持 id 不变，优化器 state 可无缝对上）
+        image_syn.data.copy_(ckpt['image_syn'].to(args.device))
+        feature_syn.data.copy_(ckpt['feature_syn'].to(args.device))
+        syn_lr.data.copy_(ckpt['syn_lr'].to(args.device))
+
+        # 2) 恢复优化器/调度器
+        for k, opt in optimizers.items():
+            state = ckpt.get('optimizers', {}).get(k, None)
+            if state is not None:
+                opt.load_state_dict(state)
+        for k, sch in schedulers.items():
+            state = ckpt.get('schedulers', {}).get(k, None)
+            if sch is not None and state is not None:
+                sch.load_state_dict(state)
+
+        # 3) AMP（若你后来加了 amp，建议也一起保存/加载 scaler）
+        if scaler is not None and ckpt.get('scaler', None) is not None:
+            scaler.load_state_dict(ckpt['scaler'])
+
+        it  = int(ckpt.get('iter', 0))
+        best_dict = ckpt.get('best_acc_dict', {})
+        best_scalar = float(max(best_dict.values())) if len(best_dict) > 0 else -1.0
+        print(f"[resume] loaded: {path} | iter={it} | best_acc={best_scalar:.2f}")
+        return it, best_dict
+
+    # 是否要从断点恢复
+    start_it = 0
+    best_acc_loaded = None
+    if getattr(args, 'resume_from', '') and osp.isfile(args.resume_from):
+        start_it, best_acc_loaded = _load_ckpt(args.resume_from)
+
+
+
+
     print('%s training begins'%get_time())
 
     expert_dir = os.path.join(args.buffer_path, args.dataset)
@@ -311,7 +412,11 @@ def main(args):
 
     best_std = {m: 0 for m in model_eval_pool}
 
-    for it in range(0, args.Iteration+1):
+
+    # === 进度条：从 start_it → args.Iteration（断点续训也能显示整体进度） ===
+    pbar = tqdm(range(start_it, args.Iteration+1), initial=start_it, total=args.Iteration+1,
+                dynamic_ncols=True, desc="Train")
+    for it in pbar:
         save_this_it = False
 
         # writer.add_scalar('Progress', it, it)
@@ -482,7 +587,14 @@ def main(args):
                             # vutils.save_image(image_data, f"synthetic_image_step_{it}.png")
                             save_name = os.path.join(save_path, f'{model_args}_iter{it}.png')
                             save_image(image_data, save_name, nrow=args.ipc)
+            # === 在这个大 if 的末尾追加：保存 ckpt ===
+            # 1) 按固定频率存“最新”
+            if (it + 1) % args.save_every == 0:
+                _save_ckpt(ckpt_last, it + 1, best_acc)
 
+            # 2) 如果这次评估刷新最好，也顺手存“最优”
+            if save_this_it:
+                _save_ckpt(ckpt_best, it + 1, best_acc)
         # wandb.log({"Synthetic_LR": syn_lr.detach().cpu()}, step=it)
 
         student_net = get_network(args.model, channel, num_classes, im_size, dist=False).to(args.device)  # get a random model
@@ -613,8 +725,8 @@ def main(args):
 
             # if step == 0:
             #     print('bef shape',feature.shape,this_feat.shape)
-            feature=avg_pool(feature)
-            this_feat = avg_pool(this_feat)
+            feature = safe_avg_pool2d(feature, kernel_size=2, stride=2)
+            this_feat = safe_avg_pool2d(this_feat, kernel_size=2, stride=2)
             # if step ==0:
             #     print('aft pool feature this_feat',feature.shape,this_feat.shape)
 
@@ -717,6 +829,8 @@ def main(args):
             print('feat matching loss = ', loss_avg_feature_matching)
             print('loss_avg_feature_step = ', loss_avg_feature_step)
             print('feat acc_avg_feat = ', acc_avg_feat)
+    # 训练结束再落一份“最后”ckpt
+    _save_ckpt(ckpt_last, args.Iteration, best_acc)
 
     # wandb.finish()
 
@@ -795,9 +909,8 @@ if __name__ == '__main__':
     parser.add_argument(
         "--layer-idx", type=int, default=None, help="layer index for feature"
     )
-    parser.add_argument(
-        "--pooling", type=str, default=None, help="feature pooling method"
-    )
+    parser.add_argument("--pooling", type=str, choices=["avg", "max", "sum", "none"], default="none",
+                    help="feature pooling method (avg/max/sum/none)")
     parser.add_argument("--feat-lbd", type=float, default=0.02, help="scale of CE")
     parser.add_argument("--feat-opt", type=str, default="SGD", help="featureoptimizer")
     parser.add_argument("--n-feat", type=int, default=1, help="number of features")
@@ -825,6 +938,12 @@ if __name__ == '__main__':
     )
     parser.add_argument("--img-path", default="../distilled_data", help="image path")
     parser.add_argument("--res-path", default="res", help="result path")
+    parser.add_argument('--generate_pretrained', action='store_true', default=False,
+                    help='Generate images_best.pt from real data and exit')
+    parser.add_argument('--resume_from', type=str, default='',
+                    help='path to checkpoint to resume from (e.g., ./logged_files/.../ckpt_last.pt)')
+    parser.add_argument('--save_every', type=int, default=1000,
+                        help='save a checkpoint every N iterations')
 
     args = parser.parse_args()
     
