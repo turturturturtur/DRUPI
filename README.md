@@ -104,7 +104,7 @@ python buffer.py --dataset=ImageNet --subset=imagewoof --model=ConvNetD5 --train
 python buffer.py --dataset=ImageNet --subset=imagemeow --model=ConvNetD5 --train_epochs=50 --num_experts=100  --buffer_path=buffer_storage --data_path=/hpc2hdd/home/yxu409/wangshaobo/FD/MTT_FD/dataset/ImageNet/OpenDataLab___ImageNet-1K/raw/ImageNet-1K
 python buffer.py --dataset=ImageNet --subset=imagesquawk --model=ConvNetD5 --train_epochs=50 --num_experts=100  --buffer_path=buffer_storage --data_path=/hpc2hdd/home/yxu409/wangshaobo/FD/MTT_FD/dataset/ImageNet/OpenDataLab___ImageNet-1K/raw/ImageNet-1K
 python buffer.py --dataset=ImageNet --subset=imageyellow --model=ConvNetD5 --train_epochs=50 --num_experts=100  --buffer_path=buffer_storage --data_path=/hpc2hdd/home/yxu409/wangshaobo/FD/MTT_FD/dataset/ImageNet/OpenDataLab___ImageNet-1K/raw/ImageNet-1K
-``
+```
 You can download MTTC100IPC48 buffer .pt files from [Huggingface](https://huggingface.co/likachan/MTT_BufferC100IPC48)
 ```
 cd MTT_FD
