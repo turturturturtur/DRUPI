@@ -70,6 +70,21 @@ conda env create -f environment.yaml
 
 conda activate DATM-FD
 ```
+## DC
+### Install Environment
+```
+cd ~/DRUPI-main/DC
+# use Python 3.13 to create environment
+uv venv --python /usr/bin/python3.13
+source .venv/bin/activate
+uv pip install numpy scipy matplotlib tqdm
+uv pip install torch torchvision
+cd ~/DRUPI-main/DC/batch_invariant_ops
+uv pip install -e .
+cd ..
+python DCmain3.0.py --data_path ~/data/ --ipc 48 --generate_pretrained
+python DCmain3.0.py --data_path ~/data/ --dataset 'CIFAR100' --init real --ipc 48 --lbd 0.01 --lbd-contrast 0.05 --batch_invariant 'eval' --tta --tta_mode 'hflip'  --batch_real 256 --batch_train 256
+```
 
 
 ## MTT
