@@ -110,7 +110,8 @@ You can download MTTC100IPC48 buffer .pt files from [Huggingface](https://huggin
 cd MTT_FD
 conda env create -n MTT -f environment.yaml
 conda activate MTT
-CUDA_VISIBLE_DEVICES=4,5,6,7 python distill_pre.py --dataset=CIFAR100 --ipc=48 --syn_steps=20 --expert_epochs=3 --max_start_epoch=20 --zca --lr_img=1000 --lr_lr=1e-05 --lr_teacher=0.01 --buffer_path ./buffers --data_path ../data --eval_it 100 # use at least four A100
+# use at least four A100
+CUDA_VISIBLE_DEVICES=4,5,6,7 python distill_pre.py --dataset=CIFAR100 --ipc=48 --syn_steps=20 --expert_epochs=3 --max_start_epoch=20 --zca --lr_img=1000 --lr_lr=1e-05 --lr_teacher=0.01 --buffer_path ./buffers --data_path ../data --eval_it 100
 
 CUDA_VISIBLE_DEVICES=4,5,6,7 python distill.py --dataset=CIFAR100 --ipc=48 --lbd 0.0005 --feat-lbd 0.0001 --pooling avg --zca --buffer_path ./buffers --data_path ../data --eval_it 100  --generate_pretrained
 
