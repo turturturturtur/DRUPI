@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import warnings
 import types
 from collections import namedtuple
@@ -129,30 +130,67 @@ class ReparamModule(nn.Module):
         return out  # Return the final output if layer_idx is not specified or out of range
 
     def get_output_from_features(self, f, layer_idx=None):
-        if layer_idx == None:
-            f = f.view(f.shape[0], -1)
-            return self.classifier(f)
+        """
+        将中间特征 f 转成 logits：
+        - 若提供 layer_idx：从“第 layer_idx 个 AvgPool2d 之后的下一层”开始把 self.features 余下层跑完
+        （与 get_features 的计数方式对齐，避免边界不一致）
+        - 然后把特征统一变成 [N, C]（4D 就自适应池化到 1x1），再送入分类头
+        - 若与分类头 in_features 不匹配，自动加一层线性适配器做维度对齐
+        """
+        head = getattr(self, 'classifier', None)
+        if head is None:
+            # 兜底：有些 backbone 用 fc 命名
+            head = getattr(self.module, 'classifier', None) or getattr(self.module, 'fc', None)
+        if head is None:
+            raise AttributeError("No classifier head found (expected 'classifier' or 'fc').")
+
         out = f
-        tgt_idx = 0
-        for layer in self.features:
-            if isinstance(layer, nn.Conv2d):
-                tgt_idx += 1
-            if tgt_idx > layer_idx:
+
+        # 1) 若指定 layer_idx：从该 AvgPool2d 之后的下一层开始，顺序跑到 features 末尾
+        if layer_idx is not None and hasattr(self, 'features'):
+            pool_cnt = 0
+            start_idx = None
+            for i, layer in enumerate(self.features):
+                if isinstance(layer, nn.AvgPool2d):
+                    pool_cnt += 1
+                    if pool_cnt == layer_idx:
+                        start_idx = i + 1  # 紧接着该池化层的下一层
+                        break
+            if start_idx is None:
+                # 未找到足够的 AvgPool2d，则视为无需额外层
+                start_idx = len(self.features)
+            for layer in list(self.features)[start_idx:]:
                 out = layer(out)
-        out = out.view(out.shape[0],-1)
-        out = self.classifier(out)
-        return out
+
+        # 2) 统一变成 [N, C]：4D 先做自适应 1x1 池化（稳，不会出 0x0）
+        if out.dim() == 4:
+            out = F.adaptive_avg_pool2d(out, (1, 1)).flatten(1)
+        else:
+            out = out.view(out.size(0), -1)
+
+        # 3) 若与分类头 in_features 不一致，自动适配
+        in_feat  = out.size(1)
+        head_in  = getattr(head, 'in_features', in_feat)
+        if in_feat != head_in:
+            if not hasattr(self, '_feat_adapter') \
+            or self._feat_adapter.in_features != in_feat \
+            or self._feat_adapter.out_features != head_in:
+                self._feat_adapter = nn.Linear(in_feat, head_in).to(out.device)
+            out = self._feat_adapter(out)
+
+        return head(out)
+
 
     def _unflatten_param(self, flat_param):
         ps = (t.view(s) for (t, s) in zip(flat_param.split(self._param_numels), self._param_shapes))
         for (mn, n), p in zip(self._param_infos, ps):
             setattr(self._get_module_from_name(mn), n, p)  # This will set as plain attr
-        for (mn, n, shared_mn, shared_n) in self._shared_param_infos:
+        for (mn, n, shared_mn, shared_n) 在 self._shared_param_infos:
             setattr(self._get_module_from_name(mn), n, getattr(self._get_module_from_name(shared_mn), shared_n))
 
     @contextmanager
     def unflattened_param(self, flat_param):
-        saved_views = [getattr(self._get_module_from_name(mn), n) for mn, n in self._param_infos]
+        saved_views = [getattr(self._get_module_from_name(mn), n) for mn, n 在 self._param_infos]
         self._unflatten_param(flat_param)
         yield
         # Why not just `self._unflatten_param(self.flat_param)`?
@@ -161,7 +199,7 @@ class ReparamModule(nn.Module):
         #    graph
         for (mn, n), p in zip(self._param_infos, saved_views):
             setattr(self._get_module_from_name(mn), n, p)
-        for (mn, n, shared_mn, shared_n) in self._shared_param_infos:
+        for (mn, n, shared_mn, shared_n) 在 self._shared_param_infos:
             setattr(self._get_module_from_name(mn), n, getattr(self._get_module_from_name(shared_mn), shared_n))
 
     @contextmanager
@@ -169,7 +207,7 @@ class ReparamModule(nn.Module):
         for (mn, n, _), new_b in zip(self._buffer_infos, buffers):
             setattr(self._get_module_from_name(mn), n, new_b)
         yield
-        for mn, n, old_b in self._buffer_infos:
+        for mn, n, old_b 在 self._buffer_infos:
             setattr(self._get_module_from_name(mn), n, old_b)
 
     def _forward_with_param_and_buffers(self, flat_param, buffers, *inputs, **kwinputs):
