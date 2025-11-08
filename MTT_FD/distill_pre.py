@@ -1,5 +1,4 @@
 import os
-import sys
 import argparse
 import numpy as np
 import torch
@@ -7,30 +6,17 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torchvision.utils
 from tqdm import tqdm
-from utils import get_dataset, get_network, get_eval_pool, evaluate_synset, get_time, DiffAugment, ParamDiffAug,FlushFile,evaluate_synset_w_feature,TensorDataset,epoch
-# import wandb
+from utils import get_dataset, get_network, get_eval_pool, evaluate_synset, get_time, DiffAugment, ParamDiffAug
+import wandb
 import copy
 import random
-from functools import partial
 from reparam_module import ReparamModule
-from feature_metric import MMDLoss, CosineLoss, SupConLoss
-import os.path as osp
+
 import warnings
-from torchvision.utils import save_image
 warnings.filterwarnings("ignore", category=DeprecationWarning)
-# 
 
-
-def manual_seed(seed=0):
-    random.seed(seed)
-    os.environ["PYTHONHASHSEED"] = str(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-    
 def main(args):
-    # manual_seed()
+
     if args.zca and args.texture:
         raise AssertionError("Cannot use zca and texture together")
 
@@ -41,32 +27,6 @@ def main(args):
         args.total_experts = args.max_experts * args.max_files
 
     print("CUDNN STATUS: {}".format(torch.backends.cudnn.enabled))
-    #
-    if args.dataset == 'ImageNet':
-        load_path = osp.join(args.img_path, args.img_method, args.dataset,args.subset, f"IPC{args.ipc}")
-    else:
-        load_path = osp.join(args.img_path, args.img_method, args.dataset, f"IPC{args.ipc}")
-    feature_strategy = args.use_feature
-    print("feature_strategy: ", feature_strategy)
-    feat_size = [128, 4, 4]
-    if args.layer_idx:
-        if args.layer_idx == 1:
-            feat_size = [128, 16, 16]
-        elif args.layer_idx == 2:
-            feat_size = [128, 8, 8]
-    if args.pooling:
-        feat_size = [128, 1, 1]
-
-    if args.feat_metric == "MSE":
-        feature_criterion = nn.MSELoss()
-    elif args.feat_metric == "MMD":
-        feature_criterion = MMDLoss()
-    elif args.feat_metric == "cosine":
-        feature_criterion = CosineLoss()
-    if args.contrast:
-        adversarial_criterion = SupConLoss()
-
-    #
 
     args.dsa = True if args.dsa == 'True' else False
     args.device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -97,16 +57,16 @@ def main(args):
     else:
         zca_trans = None
 
-    # wandb.init(sync_tensorboard=False,
-    #            project="DatasetDistillation",
-    #            job_type="CleanRepo",
-    #            config=args,
-    #            )
+    wandb.init(sync_tensorboard=False,
+               project="DatasetDistillation",
+               job_type="CleanRepo",
+               config=args,
+               )
 
-    # args = type('', (), {})()
+    args = type('', (), {})()
 
-    # for key in wandb.config._items:
-    #     setattr(args, key, wandb.config._items[key])
+    for key in wandb.config._items:
+        setattr(args, key, wandb.config._items[key])
 
     args.dsa_param = dsa_params
     args.zca_trans = zca_trans
@@ -132,28 +92,6 @@ def main(args):
 
     for i, lab in tqdm(enumerate(labels_all)):
         indices_class[lab].append(i)
-        
-    # define pooling function
-    pooling_function = None
-    if args.pooling:
-        if args.pooling == "avg":
-            # avgpooling2d function
-            pooling_function = partial(
-                torch.nn.functional.adaptive_avg_pool2d, output_size=(1, 1)
-            )
-        elif args.pooling == "max":
-            # maxpooling2d function
-            pooling_function = partial(
-                torch.nn.functional.adaptive_max_pool2d, output_size=(1, 1)
-            )
-        elif args.pooling == "sum":
-            # sumpooling2d function
-            pooling_function = partial(
-                torch.nn.functional.adaptive_sum_pool2d, output_size=(1, 1)
-            )
-        else:
-            raise NotImplementedError("Pooling method not implemented")
-    #
     images_all = torch.cat(images_all, dim=0).to("cpu")
     labels_all = torch.tensor(labels_all, dtype=torch.long, device="cpu")
 
@@ -180,64 +118,19 @@ def main(args):
     syn_lr = torch.tensor(args.lr_teacher).to(args.device)
 
     if args.pix_init == 'real':
-        image_syn_pretrained = torch.load(osp.join(load_path, f"images_best.pt")).to(
-            args.device
-        )
-        image_syn = (
-            image_syn_pretrained.clone().detach().requires_grad_(True).to(args.device)
-        )
-        del image_syn_pretrained
-        feature_syn = []
-        for _ in range(args.n_feat):
-            pretrained_net = get_network(args.model, channel, num_classes, im_size).to(
-                args.device
-            )  # get a random model
-            pretrained_net.train()
-            image_syn_train, label_syn_train = copy.deepcopy(
-                image_syn.detach()
-            ), copy.deepcopy(label_syn.detach())
-            image_train, label_train = copy.deepcopy(
-                images_all.detach()
-            ), copy.deepcopy(
-                labels_all.detach()
-            )  # avoid any unaware modification
-            dst_syn_train = TensorDataset(image_train, label_train)
-            trainloader = torch.utils.data.DataLoader(
-                dst_syn_train, batch_size=args.batch_train, shuffle=True, num_workers=0
-            )
-            optimizer_pretrained = torch.optim.SGD(pretrained_net.parameters(), lr=0.01)
-            optimizer_pretrained.zero_grad()
-            criterion = nn.CrossEntropyLoss().to(args.device)
-            epoch(
-                "train",
-                trainloader,
-                pretrained_net,
-                optimizer_pretrained,
-                criterion,
-                args,
-                aug=False
-            )
-            if isinstance(pretrained_net, torch.nn.DataParallel):
-                feature_syn_single = (
-                    pretrained_net.module.get_features(image_syn_train, args.layer_idx)
-                    .detach()
-                    .clone()
-                )
-            else:
-                feature_syn_single = (
-                    pretrained_net.get_features(image_syn_train, args.layer_idx)
-                    .detach()
-                    .clone()
-                )
-            # copy feature_syn into n_feat in the first dimension
-            feature_syn.append(feature_syn_single)
-            del pretrained_net
-        feature_syn = torch.stack(feature_syn, dim=0).to(args.device)
-        feature_syn.requires_grad_()
+        print('initialize synthetic data from random real images')
+        if args.texture:
+            for c in range(num_classes):
+                for i in range(args.canvas_size):
+                    for j in range(args.canvas_size):
+                        image_syn.data[c * args.ipc:(c + 1) * args.ipc, :, i * im_size[0]:(i + 1) * im_size[0],
+                        j * im_size[1]:(j + 1) * im_size[1]] = torch.cat(
+                            [get_images(c, 1).detach().data for s in range(args.ipc)])
+        for c in range(num_classes):
+            image_syn.data[c * args.ipc:(c + 1) * args.ipc] = get_images(c, args.ipc).detach().data
     else:
         print('initialize synthetic data from random noise')
 
-    # print('img_syn,lab_syn,feature_syn',image_syn.shape,feature_syn.shape)
 
     ''' training '''
     image_syn = image_syn.detach().to(args.device).requires_grad_(True)
@@ -245,28 +138,6 @@ def main(args):
     optimizer_img = torch.optim.SGD([image_syn], lr=args.lr_img, momentum=0.5)
     optimizer_lr = torch.optim.SGD([syn_lr], lr=args.lr_lr, momentum=0.5)
     optimizer_img.zero_grad()
-
-    #
-    # add synthetic features optimizer
-    if args.feat_opt == "SGD":
-        optimizer_feat = torch.optim.SGD(
-            [
-                feature_syn,
-            ],
-            lr=args.lr_feat,
-            momentum=0.5,
-        )  
-    else:
-        optimizer_feat = torch.optim.Adam(
-            [
-                feature_syn,
-            ],
-            lr=args.lr_feat,
-        )
-    optimizer_feat.zero_grad()
-    feature_criterion = feature_criterion.to(args.device)
-
-    #
 
     criterion = nn.CrossEntropyLoss().to(args.device)
     print('%s training begins'%get_time())
@@ -279,93 +150,261 @@ def main(args):
     expert_dir = os.path.join(expert_dir, args.model)
     print("Expert Dir: {}".format(expert_dir))
 
-    # if args.load_all:
-    #     buffer = []
-    #     n = 0
-    #     while os.path.exists(os.path.join(expert_dir, "replay_buffer_{}.pt".format(n))):
-    #         buffer = buffer + torch.load(os.path.join(expert_dir, "replay_buffer_{}.pt".format(n)))
-    #         n += 1
-    #     if n == 0:
-    #         raise AssertionError("No buffers detected at {}".format(expert_dir))
+    if args.load_all:
+        buffer = []
+        n = 0
+        while os.path.exists(os.path.join(expert_dir, "replay_buffer_{}.pt".format(n))):
+            buffer = buffer + torch.load(os.path.join(expert_dir, "replay_buffer_{}.pt".format(n)))
+            n += 1
+        if n == 0:
+            raise AssertionError("No buffers detected at {}".format(expert_dir))
 
-    # else:
-    #     expert_files = []
-    #     n = 0
-    #     while os.path.exists(os.path.join(expert_dir, "replay_buffer_{}.pt".format(n))):
-    #         expert_files.append(os.path.join(expert_dir, "replay_buffer_{}.pt".format(n)))
-    #         n += 1
-    #     if n == 0:
-    #         raise AssertionError("No buffers detected at {}".format(expert_dir))
-    #     file_idx = 0
-    #     expert_idx = 0
-    #     random.shuffle(expert_files)
-    #     if args.max_files is not None:
-    #         expert_files = expert_files[:args.max_files]
-    #     print("loading file {}".format(expert_files[file_idx]))
-    #     buffer = torch.load(expert_files[file_idx])
-    #     if args.max_experts is not None:
-    #         buffer = buffer[:args.max_experts]
-    #     random.shuffle(buffer)
+    else:
+        expert_files = []
+        n = 0
+        while os.path.exists(os.path.join(expert_dir, "replay_buffer_{}.pt".format(n))):
+            expert_files.append(os.path.join(expert_dir, "replay_buffer_{}.pt".format(n)))
+            n += 1
+        if n == 0:
+            raise AssertionError("No buffers detected at {}".format(expert_dir))
+        file_idx = 0
+        expert_idx = 0
+        random.shuffle(expert_files)
+        if args.max_files is not None:
+            expert_files = expert_files[:args.max_files]
+        print("loading file {}".format(expert_files[file_idx]))
+        buffer = torch.load(expert_files[file_idx])
+        if args.max_experts is not None:
+            buffer = buffer[:args.max_experts]
+        random.shuffle(buffer)
 
     best_acc = {m: 0 for m in model_eval_pool}
 
     best_std = {m: 0 for m in model_eval_pool}
 
+    for it in range(0, args.Iteration+1):
+        save_this_it = False
 
-    for model_eval in model_eval_pool:
-        # print('-------------------------\nEvaluation\nmodel_train = %s, model_eval = %s, iteration = %d'%(args.model, model_eval, it))
-        # if args.dsa:
-        #     print('DSA augmentation strategy: \n', args.dsa_strategy)
-        #     print('DSA augmentation parameters: \n', args.dsa_param.__dict__)
-        # else:
-        #     print('DC augmentation parameters: \n', args.dc_aug_param)
+        # writer.add_scalar('Progress', it, it)
+        wandb.log({"Progress": it}, step=it)
+        ''' Evaluate synthetic data '''
+        if it in eval_it_pool:
+            for model_eval in model_eval_pool:
+                print('-------------------------\nEvaluation\nmodel_train = %s, model_eval = %s, iteration = %d'%(args.model, model_eval, it))
+                if args.dsa:
+                    print('DSA augmentation strategy: \n', args.dsa_strategy)
+                    print('DSA augmentation parameters: \n', args.dsa_param.__dict__)
+                else:
+                    print('DC augmentation parameters: \n', args.dc_aug_param)
 
-        accs_test = []
-        accs_train = []
-        
-        feat_loss = None
+                accs_test = []
+                accs_train = []
+                for it_eval in range(args.num_eval):
+                    net_eval = get_network(model_eval, channel, num_classes, im_size).to(args.device) # get a random model
 
-        #
-        for it_eval in range(args.num_eval):
-            net_eval = get_network(model_eval, channel, num_classes, im_size).to(args.device) # get a random model
+                    eval_labs = label_syn
+                    with torch.no_grad():
+                        image_save = image_syn
+                    image_syn_eval, label_syn_eval = copy.deepcopy(image_save.detach()), copy.deepcopy(eval_labs.detach()) # avoid any unaware modification
 
-            eval_labs = label_syn
+                    args.lr_net = syn_lr.item()
+                    _, acc_train, acc_test = evaluate_synset(it_eval, net_eval, image_syn_eval, label_syn_eval, testloader, args, texture=args.texture)
+                    accs_test.append(acc_test)
+                    accs_train.append(acc_train)
+                accs_test = np.array(accs_test)
+                accs_train = np.array(accs_train)
+                acc_test_mean = np.mean(accs_test)
+                acc_test_std = np.std(accs_test)
+                if acc_test_mean > best_acc[model_eval]:
+                    best_acc[model_eval] = acc_test_mean
+                    best_std[model_eval] = acc_test_std
+                    save_this_it = True
+                print('Evaluate %d random %s, mean = %.4f std = %.4f\n-------------------------'%(len(accs_test), model_eval, acc_test_mean, acc_test_std))
+                wandb.log({'Accuracy/{}'.format(model_eval): acc_test_mean}, step=it)
+                wandb.log({'Max_Accuracy/{}'.format(model_eval): best_acc[model_eval]}, step=it)
+                wandb.log({'Std/{}'.format(model_eval): acc_test_std}, step=it)
+                wandb.log({'Max_Std/{}'.format(model_eval): best_std[model_eval]}, step=it)
+
+
+        if it in eval_it_pool and (save_this_it or it % 1000 == 0):
             with torch.no_grad():
-                image_save = image_syn
-            image_syn_eval, label_syn_eval = copy.deepcopy(image_save.detach()), copy.deepcopy(eval_labs.detach()) # avoid any unaware modification
+                image_save = image_syn.cuda()
 
-            args.lr_net = syn_lr.item()
-            feature_syn_eval = copy.deepcopy(feature_syn.detach())
+                save_dir = os.path.join(".", "logged_files", args.dataset, wandb.run.name)
 
-            _, acc_train, acc_test = evaluate_synset_w_feature(it_eval, net_eval, image_syn_eval, label_syn_eval,feature_syn_eval, testloader, args,feature_criterion, texture=args.texture,pooling_function=pooling_function,
-                feat_loss=feat_loss,
-                feature_strategy=feature_strategy,)
-            accs_test.append(acc_test)
-            accs_train.append(acc_train)
-        accs_test = np.array(accs_test)
-        accs_train = np.array(accs_train)
-        acc_test_mean = np.mean(accs_test)
-        acc_test_std = np.std(accs_test)
-        # if acc_test_mean > best_acc[model_eval]:
-        #     best_acc[model_eval] = acc_test_mean
-        #     best_std[model_eval] = acc_test_std
-        #     save_this_it = True
-        print('Evaluate %d random %s, mean = %.4f std = %.4f strategy = %s \n-------------------------'%(len(accs_test), model_eval, acc_test_mean, acc_test_std,feature_strategy))
-        # wandb.log({"Accuracy/{}".format(model_eval): acc_test_mean}, step=it)
-        # print('iter = {},model_eval = {}, Accuracy = {},'.format(it,model_eval,acc_test_mean))
-        # # wandb.log(
-        # #     {"Max_Accuracy/{}".format(model_eval): best_acc[model_eval]},
-        # #     step=it,
-        # # )
-        # print('iter = {},model_eval = {}, Max_Accuracy = {},'.format(it,model_eval, best_acc[model_eval]))
-        # # wandb.log({"Std/{}".format(model_eval): acc_test_std}, step=it)
-        # print('iter = {},model_eval = {}, Std = {},'.format(it,model_eval,acc_test_std))
-        # # wandb.log(
-        # #     {"Max_Std/{}".format(model_eval): best_std[model_eval]}, step=it
-        # # )
-        # print('iter = {},model_eval = {}, Max_Std = {},'.format(it,model_eval,best_std[model_eval]))
+                if not os.path.exists(save_dir):
+                    os.makedirs(save_dir)
 
-    # wandb.finish()
+                torch.save(image_save.cpu(), os.path.join(save_dir, "images_{}.pt".format(it)))
+                torch.save(label_syn.cpu(), os.path.join(save_dir, "labels_{}.pt".format(it)))
+
+                if save_this_it:
+                    torch.save(image_save.cpu(), os.path.join(save_dir, "images_best.pt".format(it)))
+                    torch.save(label_syn.cpu(), os.path.join(save_dir, "labels_best.pt".format(it)))
+
+                wandb.log({"Pixels": wandb.Histogram(torch.nan_to_num(image_syn.detach().cpu()))}, step=it)
+
+                if args.ipc < 50 or args.force_save:
+                    upsampled = image_save
+                    if args.dataset != "ImageNet":
+                        upsampled = torch.repeat_interleave(upsampled, repeats=4, dim=2)
+                        upsampled = torch.repeat_interleave(upsampled, repeats=4, dim=3)
+                    grid = torchvision.utils.make_grid(upsampled, nrow=10, normalize=True, scale_each=True)
+                    wandb.log({"Synthetic_Images": wandb.Image(torch.nan_to_num(grid.detach().cpu()))}, step=it)
+                    wandb.log({'Synthetic_Pixels': wandb.Histogram(torch.nan_to_num(image_save.detach().cpu()))}, step=it)
+
+                    for clip_val in [2.5]:
+                        std = torch.std(image_save)
+                        mean = torch.mean(image_save)
+                        upsampled = torch.clip(image_save, min=mean-clip_val*std, max=mean+clip_val*std)
+                        if args.dataset != "ImageNet":
+                            upsampled = torch.repeat_interleave(upsampled, repeats=4, dim=2)
+                            upsampled = torch.repeat_interleave(upsampled, repeats=4, dim=3)
+                        grid = torchvision.utils.make_grid(upsampled, nrow=10, normalize=True, scale_each=True)
+                        wandb.log({"Clipped_Synthetic_Images/std_{}".format(clip_val): wandb.Image(torch.nan_to_num(grid.detach().cpu()))}, step=it)
+
+                    if args.zca:
+                        image_save = image_save.to(args.device)
+                        image_save = args.zca_trans.inverse_transform(image_save)
+                        image_save.cpu()
+
+                        torch.save(image_save.cpu(), os.path.join(save_dir, "images_zca_{}.pt".format(it)))
+
+                        upsampled = image_save
+                        if args.dataset != "ImageNet":
+                            upsampled = torch.repeat_interleave(upsampled, repeats=4, dim=2)
+                            upsampled = torch.repeat_interleave(upsampled, repeats=4, dim=3)
+                        grid = torchvision.utils.make_grid(upsampled, nrow=10, normalize=True, scale_each=True)
+                        wandb.log({"Reconstructed_Images": wandb.Image(torch.nan_to_num(grid.detach().cpu()))}, step=it)
+                        wandb.log({'Reconstructed_Pixels': wandb.Histogram(torch.nan_to_num(image_save.detach().cpu()))}, step=it)
+
+                        for clip_val in [2.5]:
+                            std = torch.std(image_save)
+                            mean = torch.mean(image_save)
+                            upsampled = torch.clip(image_save, min=mean - clip_val * std, max=mean + clip_val * std)
+                            if args.dataset != "ImageNet":
+                                upsampled = torch.repeat_interleave(upsampled, repeats=4, dim=2)
+                                upsampled = torch.repeat_interleave(upsampled, repeats=4, dim=3)
+                            grid = torchvision.utils.make_grid(upsampled, nrow=10, normalize=True, scale_each=True)
+                            wandb.log({"Clipped_Reconstructed_Images/std_{}".format(clip_val): wandb.Image(
+                                torch.nan_to_num(grid.detach().cpu()))}, step=it)
+
+        wandb.log({"Synthetic_LR": syn_lr.detach().cpu()}, step=it)
+
+        student_net = get_network(args.model, channel, num_classes, im_size, dist=False).to(args.device)  # get a random model
+
+        student_net = ReparamModule(student_net)
+
+        if args.distributed:
+            student_net = torch.nn.DataParallel(student_net)
+
+        student_net.train()
+
+        num_params = sum([np.prod(p.size()) for p in (student_net.parameters())])
+
+        if args.load_all:
+            expert_trajectory = buffer[np.random.randint(0, len(buffer))]
+        else:
+            expert_trajectory = buffer[expert_idx]
+            expert_idx += 1
+            if expert_idx == len(buffer):
+                expert_idx = 0
+                file_idx += 1
+                if file_idx == len(expert_files):
+                    file_idx = 0
+                    random.shuffle(expert_files)
+                print("loading file {}".format(expert_files[file_idx]))
+                if args.max_files != 1:
+                    del buffer
+                    buffer = torch.load(expert_files[file_idx])
+                if args.max_experts is not None:
+                    buffer = buffer[:args.max_experts]
+                random.shuffle(buffer)
+
+        start_epoch = np.random.randint(0, args.max_start_epoch)
+        starting_params = expert_trajectory[start_epoch]
+
+        target_params = expert_trajectory[start_epoch+args.expert_epochs]
+        target_params = torch.cat([p.data.to(args.device).reshape(-1) for p in target_params], 0)
+
+        student_params = [torch.cat([p.data.to(args.device).reshape(-1) for p in starting_params], 0).requires_grad_(True)]
+
+        starting_params = torch.cat([p.data.to(args.device).reshape(-1) for p in starting_params], 0)
+
+        syn_images = image_syn
+
+        y_hat = label_syn.to(args.device)
+
+        param_loss_list = []
+        param_dist_list = []
+        indices_chunks = []
+
+        for step in range(args.syn_steps):
+
+            if not indices_chunks:
+                indices = torch.randperm(len(syn_images))
+                indices_chunks = list(torch.split(indices, args.batch_syn))
+
+            these_indices = indices_chunks.pop()
+
+
+            x = syn_images[these_indices]
+            this_y = y_hat[these_indices]
+
+            if args.texture:
+                x = torch.cat([torch.stack([torch.roll(im, (torch.randint(im_size[0]*args.canvas_size, (1,)), torch.randint(im_size[1]*args.canvas_size, (1,))), (1,2))[:,:im_size[0],:im_size[1]] for im in x]) for _ in range(args.canvas_samples)])
+                this_y = torch.cat([this_y for _ in range(args.canvas_samples)])
+
+            if args.dsa and (not args.no_aug):
+                x = DiffAugment(x, args.dsa_strategy, param=args.dsa_param)
+
+            if args.distributed:
+                forward_params = student_params[-1].unsqueeze(0).expand(torch.cuda.device_count(), -1)
+            else:
+                forward_params = student_params[-1]
+            x = student_net(x, flat_param=forward_params)
+            ce_loss = criterion(x, this_y)
+
+            grad = torch.autograd.grad(ce_loss, student_params[-1], create_graph=True)[0]
+
+            student_params.append(student_params[-1] - syn_lr * grad)
+
+
+        param_loss = torch.tensor(0.0).to(args.device)
+        param_dist = torch.tensor(0.0).to(args.device)
+
+        param_loss += torch.nn.functional.mse_loss(student_params[-1], target_params, reduction="sum")
+        param_dist += torch.nn.functional.mse_loss(starting_params, target_params, reduction="sum")
+
+        param_loss_list.append(param_loss)
+        param_dist_list.append(param_dist)
+
+
+        param_loss /= num_params
+        param_dist /= num_params
+
+        param_loss /= param_dist
+
+        grand_loss = param_loss
+
+        optimizer_img.zero_grad()
+        optimizer_lr.zero_grad()
+
+        grand_loss.backward()
+
+        optimizer_img.step()
+        optimizer_lr.step()
+
+        wandb.log({"Grand_Loss": grand_loss.detach().cpu(),
+                   "Start_Epoch": start_epoch})
+
+        for _ in student_params:
+            del _
+
+        if it%10 == 0:
+            print('%s iter = %04d, loss = %.4f' % (get_time(), it, grand_loss.item()))
+
+    wandb.finish()
 
 
 if __name__ == '__main__':
@@ -432,60 +471,8 @@ if __name__ == '__main__':
     parser.add_argument('--max_experts', type=int, default=None, help='number of experts to read per file (leave as None unless doing ablations)')
 
     parser.add_argument('--force_save', action='store_true', help='this will save images for 50ipc')
-    parser.add_argument("--lbd", type=float, default=0.01, help="scale of MSE")
-    parser.add_argument(
-        "--lr_feat",
-        type=float,
-        default=0.1,
-        help="learning rate for updating synthetic features",
-    )
-    parser.add_argument(
-        "--layer-idx", type=int, default=None, help="layer index for feature"
-    )
-    parser.add_argument(
-        "--pooling", type=str, default=None, help="feature pooling method"
-    )
-    parser.add_argument("--feat-lbd", type=float, default=0.02, help="scale of CE")
-    parser.add_argument("--feat-opt", type=str, default="SGD", help="featureoptimizer")
-    parser.add_argument("--n-feat", type=int, default=1, help="number of features")
-    parser.add_argument("--eval-freq", type=int, default=4, help="evaluate frequency")
-    parser.add_argument(
-        "--use-feature", type=str, default="mean", help="the way to use the feature"
-    )
-    parser.add_argument(
-        "--feat-norm", action="store_true", default=False, help="normalize the feature"
-    )
-    parser.add_argument(
-        "--contrast",
-        action="store_true",
-        default=False,
-        help="use the contrastive loss",
-    )
-    parser.add_argument(
-        "--lbd-contrast", type=float, default=0.1, help="scale of contrastive loss"
-    )
-    parser.add_argument(
-        "--feat-metric", type=str, default="MSE", help="feature criterion"
-    )
-    parser.add_argument(
-        "--img-method", default="MTT", help="image distillation method"
-    )
-    parser.add_argument("--img-path", default="../distilled_data", help="image path")
-    parser.add_argument("--res-path", default="res_ab", help="result path")
 
     args = parser.parse_args()
-    
-    if args.dataset == 'ImageNet':
-        model_args = f'{args.dataset}_{args.subset}_{args.ipc}ipc_[{args.feat_metric}{args.lbd}_pool{args.pooling}_layer{args.layer_idx}_CE{args.feat_lbd}_opt{args.feat_opt}_nfeat{args.n_feat}_use{args.use_feature}_norm{args.feat_norm}]_{args.img_method}_lr-feat{args.lr_feat}_{get_time()}'
-    else:
-        model_args = f'{args.dataset}_{args.ipc}ipc_[{args.feat_metric}{args.lbd}_pool{args.pooling}_layer{args.layer_idx}_CE{args.feat_lbd}_opt{args.feat_opt}_nfeat{args.n_feat}_use{args.use_feature}_norm{args.feat_norm}]_{args.img_method}_lr-feat{args.lr_feat}_{get_time()}'
-    res_path = args.res_path
-    if not os.path.exists(res_path):
-        os.mkdir(res_path)
-
-    log_file = os.path.join(res_path, f'{model_args}.txt')
-    log_file_handle = open(log_file, 'w')
-    sys.stdout = FlushFile(log_file_handle)
 
     main(args)
 
