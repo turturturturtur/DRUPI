@@ -83,7 +83,8 @@ uv pip install torch torchvision
 cd ~/DRUPI-main/DC/batch_invariant_ops
 uv pip install -e .
 cd ..
-``或从requirements.txt安装
+```
+或从requirements.txt安装
 ### Run DC
 ```
 python DCmain3.0.py --data_path $填写你的data所在文件夹的绝对路径$ --dataset 'CIFAR10' --init real --ipc 9 --lbd 0.1 --lbd-contrast 0.05 --batch_invariant 'eval' --tta --tta_mode 'hflip'  --batch_real 256 --batch_train 256 --generate_pretrained
