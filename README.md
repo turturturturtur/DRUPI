@@ -66,7 +66,7 @@
 
 ```
 cd DATM_FD
-conda env create -f environment.yaml
+conda env create -f environment.yml
 
 conda activate DATM-FD
 ```
