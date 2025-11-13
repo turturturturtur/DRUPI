@@ -185,12 +185,12 @@ class ReparamModule(nn.Module):
         ps = (t.view(s) for (t, s) in zip(flat_param.split(self._param_numels), self._param_shapes))
         for (mn, n), p in zip(self._param_infos, ps):
             setattr(self._get_module_from_name(mn), n, p)  # This will set as plain attr
-        for (mn, n, shared_mn, shared_n) 在 self._shared_param_infos:
+        for (mn, n, shared_mn, shared_n) in self._shared_param_infos:
             setattr(self._get_module_from_name(mn), n, getattr(self._get_module_from_name(shared_mn), shared_n))
 
     @contextmanager
     def unflattened_param(self, flat_param):
-        saved_views = [getattr(self._get_module_from_name(mn), n) for mn, n 在 self._param_infos]
+        saved_views = [getattr(self._get_module_from_name(mn), n) for mn, n in self._param_infos]
         self._unflatten_param(flat_param)
         yield
         # Why not just `self._unflatten_param(self.flat_param)`?
@@ -225,9 +225,9 @@ class ReparamModule(nn.Module):
         # print("DATA ON DEVICE: ", inputs[0].get_device())
         # flat_param.to("cuda:{}".format(inputs[0].get_device()))
         # self.module.to("cuda:{}".format(inputs[0].get_device()))
-        if flat_param is None:
+        if flat_param is 无:
             flat_param = self.flat_param
-        if buffers is None:
+        if buffers is 无:
             return self._forward_with_param(flat_param, *inputs, **kwinputs)
         else:
             return self._forward_with_param_and_buffers(flat_param, tuple(buffers), *inputs, **kwinputs)
