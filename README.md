@@ -117,6 +117,7 @@ python buffer.py --dataset=ImageNet --subset=imagesquawk --model=ConvNetD5 --tra
 python buffer.py --dataset=ImageNet --subset=imageyellow --model=ConvNetD5 --train_epochs=50 --num_experts=100  --buffer_path=buffer_storage --data_path=/hpc2hdd/home/yxu409/wangshaobo/FD/MTT_FD/dataset/ImageNet/OpenDataLab___ImageNet-1K/raw/ImageNet-1K
 ```
 You can download MTTC100IPC48 buffer .pt files from [Huggingface](https://huggingface.co/likachan/MTT_BufferC100IPC48)
+同时 data 文件夹中要有解压后的 cifar-100-python.tar.gz
 ```
 cd MTT_FD
 conda env create -n MTT -f environment.yml
@@ -128,6 +129,9 @@ CUDA_VISIBLE_DEVICES=4,5,6,7 python distill.py --dataset=CIFAR100 --ipc=48 --lbd
 
 CUDA_VISIBLE_DEVICES=4,5,6,7 python distill_tta.py --dataset=CIFAR100 --ipc=48 --lbd 0.0005 --feat-lbd 0.0001 --pooling avg --zca --buffer_path ./buffers --data_path ../data --eval_it 100 --tta --tta_mode 'hflip' --Iteration 8000
 ```
+### TinyImageNet
+data 文件夹中要有解压后的 tiny-imagenet-200.tar.gz
+
 
 ## DATM
 
