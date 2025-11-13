@@ -119,7 +119,7 @@ python buffer.py --dataset=ImageNet --subset=imageyellow --model=ConvNetD5 --tra
 You can download MTTC100IPC48 buffer .pt files from [Huggingface](https://huggingface.co/likachan/MTT_BufferC100IPC48)
 ```
 cd MTT_FD
-conda env create -n MTT -f environment.yaml
+conda env create -n MTT -f environment.yml
 conda activate MTT
 # use at least four A100
 CUDA_VISIBLE_DEVICES=4,5,6,7 python distill_pre.py --dataset=CIFAR100 --ipc=48 --syn_steps=20 --expert_epochs=3 --max_start_epoch=20 --zca --lr_img=1000 --lr_lr=1e-05 --lr_teacher=0.01 --buffer_path ./buffers --data_path ../data --eval_it 100
