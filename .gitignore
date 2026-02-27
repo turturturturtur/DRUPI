@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# Data (auto-downloaded)
+data/
+
+# Experiment outputs
+exp/
+exp_formal/
+exp_old/
+syn_data/
+
+# Pretrained models
+*_models/
+
+# Logs
+*.log
+
+# IDE / editor
+.vscode/
+.cursor/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
+*.yaml
+!requirements.yaml
