@@ -129,6 +129,15 @@ def apply_dataset_defaults(cfg: ExperimentConfig) -> None:
         cfg.val_ipc = 50
         cfg.input_size = 64
 
+    # For low-resolution datasets, ResNet-18 uses the modified variant in this
+    # project (3x3 conv1 + no maxpool), and matching pretrained weights are
+    # named as resnet18_modified.
+    if subset in {"cifar10", "cifar100", "tinyimagenet"}:
+        if cfg.arch_name == "resnet18":
+            cfg.arch_name = "resnet18_modified"
+        if cfg.stud_name == "resnet18":
+            cfg.stud_name = "resnet18_modified"
+
     # always keep nclass consistent with classes length if classes has been set
     if cfg.classes:
         cfg.nclass = len(cfg.classes)
@@ -143,10 +152,10 @@ def infer_training_hyperparams(cfg: ExperimentConfig) -> None:
     cfg.val_dir = str(data_root / cfg.subset / "val")
 
     if cfg.re_batch_size == 0:
-        if cfg.ipc == 50:
+        if cfg.ipc == 48:
             cfg.re_batch_size = 100
             cfg.workers = 4
-        elif cfg.ipc == 10:
+        elif cfg.ipc == 9:
             cfg.re_batch_size = 50
             cfg.workers = 4
         elif cfg.ipc == 1:
@@ -354,4 +363,3 @@ def parse_args_to_config(argv: Optional[Iterable[str]] = None) -> ExperimentConf
         cfg.temperature = args.temperature
 
     return finalize_config(cfg)
-

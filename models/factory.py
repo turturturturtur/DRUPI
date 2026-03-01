@@ -12,6 +12,13 @@ from config import ExperimentConfig
 from models.convnet import ConvNet
 
 
+def _resolve_model_name_for_dataset(model_name: str, dataset: str) -> str:
+    """Normalize model names to dataset-compatible variants."""
+    if dataset in {"cifar10", "cifar100", "tinyimagenet"} and model_name == "resnet18":
+        return "resnet18_modified"
+    return model_name
+
+
 class _FeatureExtractorWrapper(nn.Module):
     """Wrap a backbone to uniformly support ``forward(x, return_features=True)``
     and expose a ``.classifier`` property pointing to the final linear layer.
@@ -145,9 +152,10 @@ def create_model(
 ) -> nn.Module:
     """Create a model backbone and optionally load pretrained weights."""
 
+    resolved_model_name = _resolve_model_name_for_dataset(model_name, dataset)
     classes_list = list(classes)
     num_classes = len(classes_list) if classes_list else 1000
-    model = _create_backbone(model_name, dataset, num_classes)
+    model = _create_backbone(resolved_model_name, dataset, num_classes)
     model = _prune_classifier(model, classes_list)
 
     if pretrained:
@@ -163,14 +171,16 @@ def create_model(
             from pathlib import Path
             from data.download import ensure_pretrained_model
 
-            pth_path = ensure_pretrained_model(dataset, model_name, Path(data_root))
+            pth_path = ensure_pretrained_model(
+                dataset, resolved_model_name, Path(data_root)
+            )
             checkpoint = torch.load(pth_path, map_location="cpu", weights_only=False)
             state = checkpoint.get("model", checkpoint)
             model.load_state_dict(state)
         elif dataset == "imagenet-1k":
-            if model_name == "efficientNet-b0":
+            if resolved_model_name == "efficientNet-b0":
                 _patch_weights_enum()
-            model = thmodels.__dict__[model_name](pretrained=True)
+            model = thmodels.__dict__[resolved_model_name](pretrained=True)
 
     return _ensure_feature_api(model)
 
@@ -199,4 +209,3 @@ def build_student(cfg: ExperimentConfig) -> nn.Module:
         data_root=cfg.data_root,
     )
     return model
-

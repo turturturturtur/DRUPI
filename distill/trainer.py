@@ -187,8 +187,8 @@ class DistillationTrainer:
 
         print_info = (
             f"TRAIN Iter {epoch}: loss = {objs.avg:.6f},\t"
-            + f"Top-1 err = {100 - top1.avg:.6f},\t"
-            + f"Top-5 err = {100 - top5.avg:.6f},\t"
+            + f"Top-1 acc = {top1.avg:.6f},\t"
+            + f"Top-5 acc = {top5.avg:.6f},\t"
             + f"train_time = {time.time() - t1:.6f}"
         )
         print(print_info)
@@ -218,8 +218,8 @@ class DistillationTrainer:
 
         log_info = (
             f"TEST:\nIter {epoch}: loss = {objs.avg:.6f},\t"
-            + f"Top-1 err = {100 - top1.avg:.6f},\t"
-            + f"Top-5 err = {100 - top5.avg:.6f},\t"
+            + f"Top-1 acc = {top1.avg:.6f},\t"
+            + f"Top-5 acc = {top5.avg:.6f},\t"
             + f"val_time = {time.time() - t1:.6f}"
         )
         print(log_info)
@@ -254,4 +254,3 @@ def run_distillation(cfg: ExperimentConfig) -> TrainingResult:
     """Convenience function to run full distillation."""
     trainer = DistillationTrainer(cfg)
     return trainer.fit()
-

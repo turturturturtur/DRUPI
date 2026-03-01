@@ -17,7 +17,8 @@ syn_data/
 # Pretrained models
 *_models/
 
-# Logs
+# Logs (keep directory structure via .gitkeep, ignore content)
+logs/**/*.log
 *.log
 
 # IDE / editor
